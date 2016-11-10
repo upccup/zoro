@@ -142,7 +142,7 @@ func (rc *raftNode) entriesToApply(ents []raftpb.Entry) []raftpb.Entry {
 		log.Fatalf("first index of committed entry [%d] should <= progress.appliedIndex[%d] 1", firstIdx, rc.appliedIndex)
 	}
 
-	if rc.appliedIndex-firstIdx+1 > uint64(len(ents)) {
+	if rc.appliedIndex-firstIdx+1 < uint64(len(ents)) {
 		nents = ents[rc.appliedIndex-firstIdx+1:]
 	}
 
@@ -314,7 +314,7 @@ func (rc *raftNode) startRaft() {
 		}
 	}
 
-	go rc.serveRatf()
+	go rc.serveRaft()
 
 	go rc.serveChannels()
 }
@@ -452,6 +452,9 @@ func (rc *raftNode) serveChannels() {
 				return
 			}
 
+			rc.maybeTriggerSnapshot()
+			rc.node.Advance()
+
 		case err := <-rc.transport.ErrorC:
 			rc.writeError(err)
 			return
@@ -463,22 +466,22 @@ func (rc *raftNode) serveChannels() {
 	}
 }
 
-func (rc *raftNode) serveRatf() {
+func (rc *raftNode) serveRaft() {
 	url, err := url.Parse(rc.peers[rc.id-1])
 	if err != nil {
-		log.Fatalf("serveRatf: failed parsing URL %v", err)
+		log.Fatalf("serveRaft: failed parsing URL %v", err)
 	}
 
 	ln, err := newStoppableListener(url.Host, rc.httpstopc)
 	if err != nil {
-		log.Fatalf("serveRatf: failed to listen rafthttp %v", err)
+		log.Fatalf("serveRaft: failed to listen rafthttp %v", err)
 	}
 
 	err = (&http.Server{Handler: rc.transport.Handler()}).Serve(ln)
 	select {
 	case <-rc.httpstopc:
 	default:
-		log.Fatalf("serveRatf: failed to serve rafthttp", err)
+		log.Fatalf("serveRaft: failed to serve rafthttp", err)
 	}
 
 	close(rc.httpstopc)

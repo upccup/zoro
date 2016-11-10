@@ -103,6 +103,8 @@ func serveHttpKVAPI(kv *kvstore, port int, confChangeC chan<- raftpb.ConfChange,
 		},
 	}
 
+	log.Printf("http server: %v", srv)
+
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			log.Fatal(err)
