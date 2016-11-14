@@ -327,6 +327,7 @@ func (n *node) run(r *raft) {
 				}
 				break
 			}
+
 			switch cc.Type {
 			case pb.ConfChangeAddNode:
 				r.addNode(cc.NodeID)
