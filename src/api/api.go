@@ -5,5 +5,5 @@ import (
 )
 
 type Api struct {
-	Node *raft.RaftNode
+	Node *raft.Node
 }
