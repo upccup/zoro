@@ -1,3 +1,3 @@
-package api
+package types
 
-//protoc --proto_path=../../../../coreos/etcd/raft:../../../../gogo/protobuf/:. --gogo_out=plugins=grpc:. *.proto
+//protoc --proto_path=../../../../../github.com/coreos/etcd/raft:../../../../../github.com/gogo/protobuf/:. --gogo_out=plugins=grpc:. *.proto

@@ -2,6 +2,22 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "code.cloudfoundry.org/clock",
+			"repository": "https://github.com/cloudfoundry/clock",
+			"vcs": "git",
+			"revision": "e0835a7d46f9ea781e764f0dc9325110e32a97dd",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/Sirupsen/logrus",
+			"repository": "https://github.com/Sirupsen/logrus",
+			"vcs": "git",
+			"revision": "abc6f20dabf4b10195f233ad21ea6c5ba33acae0",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/beorn7/perks/quantile",
 			"repository": "https://github.com/beorn7/perks",
 			"vcs": "git",
@@ -173,6 +189,104 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/docker/go-events",
+			"repository": "https://github.com/docker/go-events",
+			"vcs": "git",
+			"revision": "aa2e3b613fbbfdddbe055a7b9e3ce271cfd83eca",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/swarmkit/log",
+			"repository": "https://github.com/docker/swarmkit",
+			"vcs": "git",
+			"revision": "dbff2a269a04ca4926ef4d09896d5ffb19a40805",
+			"branch": "master",
+			"path": "/log",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/swarmkit/vendor/github.com/Sirupsen/logrus",
+			"repository": "https://github.com/docker/swarmkit",
+			"vcs": "git",
+			"revision": "dbff2a269a04ca4926ef4d09896d5ffb19a40805",
+			"branch": "master",
+			"path": "vendor/github.com/Sirupsen/logrus",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/swarmkit/vendor/github.com/docker/go-events",
+			"repository": "https://github.com/docker/swarmkit",
+			"vcs": "git",
+			"revision": "dbff2a269a04ca4926ef4d09896d5ffb19a40805",
+			"branch": "master",
+			"path": "vendor/github.com/docker/go-events",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/swarmkit/vendor/golang.org/x/net/context",
+			"repository": "https://github.com/docker/swarmkit",
+			"vcs": "git",
+			"revision": "dbff2a269a04ca4926ef4d09896d5ffb19a40805",
+			"branch": "master",
+			"path": "vendor/golang.org/x/net/context",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/swarmkit/vendor/golang.org/x/sys/unix",
+			"repository": "https://github.com/docker/swarmkit",
+			"vcs": "git",
+			"revision": "dbff2a269a04ca4926ef4d09896d5ffb19a40805",
+			"branch": "master",
+			"path": "vendor/golang.org/x/sys/unix",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/swarmkit/vendor/google.golang.org/grpc/grpclog",
+			"repository": "https://github.com/docker/swarmkit",
+			"vcs": "git",
+			"revision": "dbff2a269a04ca4926ef4d09896d5ffb19a40805",
+			"branch": "master",
+			"path": "vendor/google.golang.org/grpc/grpclog",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/swarmkit/watch",
+			"repository": "https://github.com/docker/swarmkit",
+			"vcs": "git",
+			"revision": "dbff2a269a04ca4926ef4d09896d5ffb19a40805",
+			"branch": "master",
+			"path": "/watch",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/gogo/protobuf/proto",
+			"repository": "https://github.com/gogo/protobuf",
+			"vcs": "git",
+			"revision": "8d70fb3182befc465c4a1eac8ad4d38ff49778e2",
+			"branch": "master",
+			"path": "/proto",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/gogo/protobuf/sortkeys",
+			"repository": "https://github.com/gogo/protobuf",
+			"vcs": "git",
+			"revision": "8d70fb3182befc465c4a1eac8ad4d38ff49778e2",
+			"branch": "master",
+			"path": "sortkeys",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/gogo/protobuf/types",
+			"repository": "https://github.com/gogo/protobuf",
+			"vcs": "git",
+			"revision": "8d70fb3182befc465c4a1eac8ad4d38ff49778e2",
+			"branch": "master",
+			"path": "types",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/golang/protobuf/proto",
 			"repository": "https://github.com/golang/protobuf",
 			"vcs": "git",
@@ -197,6 +311,14 @@
 			"revision": "c12348ce28de40eed0136aa2b644d0ee0650e56c",
 			"branch": "master",
 			"path": "/pbutil",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/pivotal-golang/clock",
+			"repository": "https://github.com/pivotal-golang/clock",
+			"vcs": "git",
+			"revision": "e0835a7d46f9ea781e764f0dc9325110e32a97dd",
+			"branch": "master",
 			"notests": true
 		},
 		{
@@ -267,6 +389,31 @@
 			"revision": "9ef22118a4b25863aa94546daffbc0a18feaafb3",
 			"branch": "master",
 			"path": "/context",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/sys/unix",
+			"repository": "https://go.googlesource.com/sys",
+			"vcs": "git",
+			"revision": "b699b7032584f0953262cb2788a0ca19bb494703",
+			"branch": "master",
+			"path": "/unix",
+			"notests": true
+		},
+		{
+			"importpath": "gopkg.in/airbrake/gobrake.v2",
+			"repository": "https://gopkg.in/airbrake/gobrake.v2",
+			"vcs": "git",
+			"revision": "5d77bd50d083834501349f8be70197b26963674d",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "gopkg.in/gemnasium/logrus-airbrake-hook.v2",
+			"repository": "https://gopkg.in/gemnasium/logrus-airbrake-hook.v2",
+			"vcs": "git",
+			"revision": "bfee1239d796830ca346767650cce5ba90d58c57",
+			"branch": "master",
 			"notests": true
 		}
 	]

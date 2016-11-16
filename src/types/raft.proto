@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-package api;
+package types;
 
-import "raftpb/raft.proto";
-import "gogoproto/gogo.proto";
+// import "github.com/coreos/etcd/raft/raftpb/raft.proto";
+import weak "gogoproto/gogo.proto";
 
 option (gogoproto.populate_all) = true;
 option (gogoproto.testgen_all) = true;
@@ -15,62 +15,62 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_getters_all) = false;
 
-service Raft {
-    rpc  ProcessRaftMessage(ProcessRaftMessageRequest) returns (ProcessRaftMessageReponse) {};
-
-    rpc ResolveAddress(ResolveAddressRequest) returns (ResolveAddressReponse) {};
-}
-
-message RaftMember {
-    uint64 raft_id = 1 [(gogoproto.customname) = "RaftID"];
-    string node_id = 2 [(gogoproto.customname) = "NodeID"];
-    string addr = 3;
-    RaftMemberStatus status = 4 [(gogoproto.nullable) = false];
-}
-
-message RaftMemberStatus {
-	bool leader = 1;
-
-	enum Reachability {
-		UNKNOWN = 0;
-		UNREACHABLE = 1;
-		REACHABLE = 2;
-	}
-
-	Reachability reachability = 2;
-	string message = 3;
-}
-
-message JoinRequest {
-    string addr = 1;
-}
-
-message JoinResponse {
-    uint64 raft_id = 1 [(gogoproto.customname) = "RaftID"];
-    repeated RaftMember members = 2;
-    repeated uint64 removed_members = 3;
-}
-
-message LeaveRequest {
-    RaftMember node = 1;
-}
-
-message LeaveResponse {}
-
-message ProcessRaftMessageRequest {
-    raftpb.Message message = 1;
-}
-
-message ProcessRaftMessageReponse {}
-
-message ResolveAddressRequest {
-    uint64 raft_id = 1 [(gogoproto.customname) = "RaftID"];
-}
-
-message ResolveAddressReponse {
-    string addr = 1;
-}
-
+//service Raft {
+//    rpc  ProcessRaftMessage(ProcessRaftMessageRequest) returns (ProcessRaftMessageReponse) {};
+//
+//    rpc ResolveAddress(ResolveAddressRequest) returns (ResolveAddressReponse) {};
+//}
+//
+//message RaftMember {
+//    uint64 raft_id = 1 [(gogoproto.customname) = "RaftID"];
+//    string node_id = 2 [(gogoproto.customname) = "NodeID"];
+//    string addr = 3;
+//    RaftMemberStatus status = 4 [(gogoproto.nullable) = false];
+//}
+//
+//message RaftMemberStatus {
+//	bool leader = 1;
+//
+//	enum Reachability {
+//		UNKNOWN = 0;
+//		UNREACHABLE = 1;
+//		REACHABLE = 2;
+//	}
+//
+//	Reachability reachability = 2;
+//	string message = 3;
+//}
+//
+//message JoinRequest {
+//    string addr = 1;
+//}
+//
+//message JoinResponse {
+//    uint64 raft_id = 1 [(gogoproto.customname) = "RaftID"];
+//    repeated RaftMember members = 2;
+//    repeated uint64 removed_members = 3;
+//}
+//
+//message LeaveRequest {
+//    RaftMember node = 1;
+//}
+//
+//message LeaveResponse {}
+//
+//message ProcessRaftMessageRequest {
+//    raftpb.Message message = 1;
+//}
+//
+//message ProcessRaftMessageReponse {}
+//
+//message ResolveAddressRequest {
+//    uint64 raft_id = 1 [(gogoproto.customname) = "RaftID"];
+//}
+//
+//message ResolveAddressReponse {
+//    string addr = 1;
+//}
+//
 message InternalRaftRequest {
     uint64 id = 1 [(gogoproto.customname) = "ID"];
 
