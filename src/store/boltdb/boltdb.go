@@ -46,7 +46,7 @@ func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) 
 	return bkt, nil
 }
 
-func (db *Boltdb) PutKeyValue(key, value string) error {
+func (db *Boltdb) PutKeyValue(key string, value []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(bucketKeyStorageVersion)
 
@@ -54,7 +54,7 @@ func (db *Boltdb) PutKeyValue(key, value string) error {
 			return errStorageVersionUnknown
 		}
 
-		return bkt.Put([]byte(key), []byte(value))
+		return bkt.Put([]byte(key), value)
 	})
 }
 

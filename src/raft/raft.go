@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/upccup/zoro/src/store"
 	ztypes "github.com/upccup/zoro/src/types"
 
 	"github.com/Sirupsen/logrus"
@@ -57,8 +58,8 @@ var (
 )
 
 type Node struct {
-	commitC chan<- *string // entries committed to log(k,v)
-	errorC  chan<- error   // errors from raft serrion
+	commitC chan<- []byte // entries committed to log(k,v)
+	errorC  chan<- error  // errors from raft serrion
 
 	id          int      // client id for raft serrsion
 	peers       []string // raft peer URLS
@@ -92,6 +93,7 @@ type Node struct {
 	signalledLeadership uint32
 	ticker              clock.Ticker
 	leadershipBroadcast *watch.Queue
+	store               store.Store
 
 	// used to coordinate shutdown
 	// Lock should be used only in stop(), all other functions should use RLock.
@@ -108,9 +110,9 @@ type applyResult struct {
 	err  error
 }
 
-func NewNode(id int, peers []string, getSnapshot func() ([]byte, error)) (<-chan *string, <-chan error, <-chan *snap.Snapshotter, *Node) {
+func NewNode(id int, peers []string, getSnapshot func() ([]byte, error)) (<-chan []byte, <-chan error, <-chan *snap.Snapshotter, *Node) {
 
-	commitC := make(chan *string)
+	commitC := make(chan []byte)
 	errorC := make(chan error)
 
 	n := Node{
@@ -351,6 +353,14 @@ func (n *Node) entriesToApply(ents []raftpb.Entry) []raftpb.Entry {
 	return nents
 }
 
+func (n *Node) saveEntry(r *ztypes.InternalRaftRequest) error {
+	action, err := r.Action.Marshal()
+	if err != nil {
+		return err
+	}
+	return n.store.PutKeyValue(strconv.FormatUint(r.ID, 10), action)
+}
+
 func (n *Node) publishEntries(ents []raftpb.Entry) bool {
 	for i := range ents {
 		switch ents[i].Type {
@@ -359,11 +369,9 @@ func (n *Node) publishEntries(ents []raftpb.Entry) bool {
 				break
 			}
 
-			s := string(ents[i].Data)
-
-			select {
-			case n.commitC <- &s:
-			case <-n.stopc:
+			var r ztypes.InternalRaftRequest
+			if err := &r.Unmarshal(ents[i].Data); err != nil {
+				log.L.Errorf("store date got error: %s", err.Error())
 				return false
 			}
 
