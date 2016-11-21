@@ -19,8 +19,9 @@ var (
 )
 
 func NewBoltdbStore(db *bolt.DB) (*Boltdb, error) {
-	if err := db.Update(func(tx *bolt.Tx) {
-		createBucketIfNotExists(tx, bucketKeyStorageVersion)
+	if err := db.Update(func(tx *bolt.Tx) error {
+		_, err := createBucketIfNotExists(tx, bucketKeyStorageVersion)
+		return err
 	}); err != nil {
 		return nil, err
 	}
@@ -74,4 +75,8 @@ func (db *Boltdb) GetKeyValue(key string) (string, error) {
 	}
 
 	return value, nil
+}
+
+func (db *Boltdb) GetSnapshot() ([]byte, error) {
+	return []byte{}, nil
 }

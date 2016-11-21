@@ -58,16 +58,14 @@ var (
 )
 
 type Node struct {
-	commitC chan<- []byte // entries committed to log(k,v)
-	errorC  chan<- error  // errors from raft serrion
+	errorC chan<- error // errors from raft serrion
 
-	id          int      // client id for raft serrsion
-	peers       []string // raft peer URLS
-	join        bool     // node is joining an existing cluster
-	waldir      string   // path to WAL directory
-	snapdir     string   // path to snapshot directory
-	getSnapshot func() ([]byte, error)
-	lastIndex   uint64 // indix of log at start
+	id        int      // client id for raft serrsion
+	peers     []string // raft peer URLS
+	join      bool     // node is joining an existing cluster
+	waldir    string   // path to WAL directory
+	snapdir   string   // path to snapshot directory
+	lastIndex uint64   // indix of log at start
 
 	confState     raftpb.ConfState
 	snapshotIndex uint64
@@ -78,14 +76,12 @@ type Node struct {
 	raftStorage *raft.MemoryStorage
 	wal         *wal.WAL
 
-	snapshotter      *snap.Snapshotter
-	snapshotterReady chan *snap.Snapshotter
-
-	snapCount uint64
-	transport *rafthttp.Transport
-	stopc     chan struct{}
-	httpstopc chan struct{}
-	httpdonec chan struct{}
+	snapshotter *snap.Snapshotter
+	snapCount   uint64
+	transport   *rafthttp.Transport
+	stopc       chan struct{}
+	httpstopc   chan struct{}
+	httpdonec   chan struct{}
 
 	stoppedC            chan struct{}
 	wait                *wait
@@ -110,37 +106,33 @@ type applyResult struct {
 	err  error
 }
 
-func NewNode(id int, peers []string, getSnapshot func() ([]byte, error)) (<-chan []byte, <-chan error, <-chan *snap.Snapshotter, *Node) {
+func NewNode(id int, peers []string, store store.Store) (<-chan error, *Node) {
 
-	commitC := make(chan []byte)
 	errorC := make(chan error)
 
 	n := Node{
-		commitC:     commitC,
 		errorC:      errorC,
 		id:          id,
 		peers:       peers,
 		waldir:      fmt.Sprintf("node-%d", id),
 		snapdir:     fmt.Sprintf("node-%d-snap", id),
-		getSnapshot: getSnapshot,
 		raftStorage: raft.NewMemoryStorage(),
 		snapCount:   defaultSnapCount,
 		stopc:       make(chan struct{}),
 		httpstopc:   make(chan struct{}),
 		httpdonec:   make(chan struct{}),
 		stoppedC:    make(chan struct{}),
-
-		snapshotterReady: make(chan *snap.Snapshotter, 1),
+		store:       store,
 	}
 
 	n.leadershipBroadcast = watch.NewQueue()
 	n.ticker = clock.NewClock().NewTicker(time.Second)
 	n.reqIDGen = idutil.NewGenerator(uint16(n.id), time.Now())
-	n.wait = newWati()
+	n.wait = newWait()
 
 	go n.startRaft()
 
-	return commitC, errorC, n.snapshotterReady, &n
+	return errorC, &n
 }
 
 // Run is the main loop for a Raft node it goes along the state machine
@@ -198,7 +190,7 @@ func (n *Node) Run(ctx context.Context) error {
 			n.raftStorage.Append(rd.Entries)
 			n.transport.Send(rd.Messages)
 			if ok := n.publishEntries(n.entriesToApply(rd.CommittedEntries)); !ok {
-				n.stop(ctx)
+				log.G(ctx).Println("*************************")
 				return errors.New("publishEntries failed")
 			}
 
@@ -213,15 +205,34 @@ func (n *Node) Run(ctx context.Context) error {
 			n.raftNode.Advance()
 
 		case err := <-n.transport.ErrorC:
+			log.G(ctx).Println("*************************222", err)
 			n.writeError(err)
 			return err
 
 		case <-n.stopc:
+			log.G(ctx).Println("*************************11")
 			n.stop(ctx)
 			return nil
 
 		}
 	}
+}
+
+func (n *Node) LoadSnapshot() {
+	snapshot, err := n.snapshotter.Load()
+	if err == snap.ErrNoSnapshot {
+		return
+	}
+
+	if err != nil && err != snap.ErrNoSnapshot {
+		log.L.Panic(err)
+	}
+
+	log.L.Printf("loading snapshot at term %d and index %d", snapshot.Metadata.Term, snapshot.Metadata.Index)
+	//TODO recover from snapshot
+	//if err := s.recoverFromSnapshot(snapshot.Data); err != nil {
+	//	log.L.Panic(err)
+	//}
 }
 
 func (n *Node) caughtUp() bool {
@@ -276,6 +287,7 @@ func (n *Node) processInternalRaftRequest(ctx context.Context, r *ztypes.Interna
 	n.stopMu.RUnlock()
 
 	r.ID = n.reqIDGen.Next()
+	fmt.Println("--------------:  ", r.ID)
 
 	// this must be derived from the context which is cancelled bu stop()
 	// to avoid a deadlock on shutdown
@@ -353,14 +365,6 @@ func (n *Node) entriesToApply(ents []raftpb.Entry) []raftpb.Entry {
 	return nents
 }
 
-func (n *Node) saveEntry(r *ztypes.InternalRaftRequest) error {
-	action, err := r.Action.Marshal()
-	if err != nil {
-		return err
-	}
-	return n.store.PutKeyValue(strconv.FormatUint(r.ID, 10), action)
-}
-
 func (n *Node) publishEntries(ents []raftpb.Entry) bool {
 	for i := range ents {
 		switch ents[i].Type {
@@ -370,10 +374,13 @@ func (n *Node) publishEntries(ents []raftpb.Entry) bool {
 			}
 
 			var r ztypes.InternalRaftRequest
-			if err := &r.Unmarshal(ents[i].Data); err != nil {
+			if err := r.Unmarshal(ents[i].Data); err != nil {
 				log.L.Errorf("store date got error: %s", err.Error())
 				return false
 			}
+
+			id := strconv.FormatUint(r.ID, 10)
+			n.store.PutKeyValue(id, []byte(id))
 
 		case raftpb.EntryConfChange:
 			var cc raftpb.ConfChange
@@ -400,11 +407,7 @@ func (n *Node) publishEntries(ents []raftpb.Entry) bool {
 
 		// special nil commit to signal replay has finished
 		if ents[i].Index == n.lastIndex {
-			select {
-			case n.commitC <- nil:
-			case <-n.stopc:
-				return false
-			}
+			n.LoadSnapshot()
 		}
 	}
 
@@ -451,7 +454,7 @@ func (n *Node) replayWAL() *wal.WAL {
 	if len(ents) > 0 {
 		n.lastIndex = ents[len(ents)-1].Index
 	} else {
-		n.commitC <- nil
+		n.LoadSnapshot()
 	}
 
 	n.raftStorage.SetHardState(st)
@@ -460,7 +463,6 @@ func (n *Node) replayWAL() *wal.WAL {
 
 func (n *Node) writeError(err error) {
 	n.stopHTTP()
-	close(n.commitC)
 	n.errorC <- err
 	close(n.errorC)
 	n.raftNode.Stop()
@@ -474,14 +476,13 @@ func (n *Node) startRaft() {
 	}
 
 	n.snapshotter = snap.New(n.snapdir)
-	n.snapshotterReady <- n.snapshotter
 
 	oldwal := wal.Exist(n.waldir)
 	n.wal = n.replayWAL()
 
-	rpeers := make([]raft.Peer, len(n.peers))
-	for i := range rpeers {
-		rpeers[i] = raft.Peer{ID: uint64(i + 1)}
+	startPeers := make([]raft.Peer, len(n.peers))
+	for i := range startPeers {
+		startPeers[i] = raft.Peer{ID: uint64(i + 1)}
 	}
 
 	c := raft.Config{
@@ -496,7 +497,6 @@ func (n *Node) startRaft() {
 	if oldwal {
 		n.raftNode = raft.RestartNode(&c)
 	} else {
-		startPeers := rpeers
 		n.raftNode = raft.StartNode(&c, startPeers)
 	}
 
@@ -530,12 +530,13 @@ func (n *Node) startRaft() {
 	n.confState = snap.Metadata.ConfState
 	n.snapshotIndex = snap.Metadata.Index
 	n.appliedIndex = snap.Metadata.Index
+
+	go n.Run(context.TODO())
 }
 
 // closes http closes all channels and stops rafts
 func (n *Node) stop(ctx context.Context) {
 	n.stopHTTP()
-	close(n.commitC)
 	close(n.errorC)
 	n.leadershipBroadcast.Close()
 	n.ticker.Stop()
@@ -560,7 +561,7 @@ func (n *Node) publishSnapshot(snapshotToSave raftpb.Snapshot) {
 		log.L.Fatalf("publishSnapshot: snapshot index [%d] should > progress.appliedIndex [%d] + 1", snapshotToSave.Metadata.Index, n.appliedIndex)
 	}
 
-	n.commitC <- nil // trigger kvstore to load snapshot
+	n.LoadSnapshot()
 
 	n.confState = snapshotToSave.Metadata.ConfState
 	n.snapshotIndex = snapshotToSave.Metadata.Index
@@ -575,7 +576,7 @@ func (n *Node) maybeTriggerSnapshot() {
 	}
 
 	log.L.Printf("maybeTriggerSnapshot: start snapshot [applied index: %d | last snapshot index: %d]", n.appliedIndex, n.snapshotIndex)
-	data, err := n.getSnapshot()
+	data, err := n.store.GetSnapshot()
 	if err != nil {
 		log.L.Panic(err)
 	}
