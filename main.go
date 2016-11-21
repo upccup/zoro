@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	//"golang.org/x/net/context"
+	"golang.org/x/net/context"
 
+	events "github.com/docker/go-events"
 	"github.com/upccup/zoro/src/api"
 	"github.com/upccup/zoro/src/raft"
 	"github.com/upccup/zoro/src/store/boltdb"
@@ -35,7 +36,10 @@ func main() {
 
 	_, raftNode := raft.NewNode(*id, strings.Split(*cluster, ","), boltdbStore)
 
-	//go raftNode.Run(context.TODO())
+	leadershipCh, cancel := raftNode.SubscribeLeaderShip()
+	defer cancel()
+
+	go handleLeadershipEvents(context.TODO(), leadershipCh)
 
 	api := api.Api{
 		Node:  raftNode,
@@ -51,5 +55,23 @@ func main() {
 	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func handleLeadershipEvents(ctx context.Context, leadershipCh chan events.Event) {
+	for {
+		select {
+		case leadershipEvent := <-leadershipCh:
+			// TODO lock it and if manager stop return
+			newState := leadershipEvent.(raft.LeadershipState)
+
+			if newState == raft.IsLeader {
+				fmt.Println("Now i am a leader !!!!!")
+			} else if newState == raft.IsFollower {
+				fmt.Println("Now i am a follower !!!!!")
+			}
+		case <-ctx.Done():
+			return
+		}
 	}
 }

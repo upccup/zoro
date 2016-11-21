@@ -25,6 +25,7 @@ import (
 	"github.com/coreos/etcd/snap"
 	"github.com/coreos/etcd/wal"
 	"github.com/coreos/etcd/wal/walpb"
+	events "github.com/docker/go-events"
 	"github.com/docker/swarmkit/log"
 	"github.com/docker/swarmkit/watch"
 	"github.com/gogo/protobuf/proto"
@@ -327,6 +328,10 @@ func (n *Node) processInternalRaftRequest(ctx context.Context, r *ztypes.Interna
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+func (n *Node) SubscribeLeaderShip() (q chan events.Event, cancel func()) {
+	return n.leadershipBroadcast.Watch()
 }
 
 func (n *Node) saveSnap(snap raftpb.Snapshot) error {
