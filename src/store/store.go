@@ -1,7 +1,9 @@
 package store
 
 type Store interface {
-	PutKeyValue(key, value string) error
+	PutKeyValue(key string, value []byte) error
 
 	GetKeyValue(key string) (string, error)
+
+	GetSnapshot() ([]byte, error)
 }

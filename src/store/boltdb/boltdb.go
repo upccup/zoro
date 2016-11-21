@@ -19,8 +19,9 @@ var (
 )
 
 func NewBoltdbStore(db *bolt.DB) (*Boltdb, error) {
-	if err := db.Update(func(tx *bolt.Tx) {
-		createBucketIfNotExists(tx, bucketKeyStorageVersion)
+	if err := db.Update(func(tx *bolt.Tx) error {
+		_, err := createBucketIfNotExists(tx, bucketKeyStorageVersion)
+		return err
 	}); err != nil {
 		return nil, err
 	}
@@ -46,7 +47,7 @@ func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) 
 	return bkt, nil
 }
 
-func (db *Boltdb) PutKeyValue(key, value string) error {
+func (db *Boltdb) PutKeyValue(key string, value []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(bucketKeyStorageVersion)
 
@@ -54,7 +55,7 @@ func (db *Boltdb) PutKeyValue(key, value string) error {
 			return errStorageVersionUnknown
 		}
 
-		return bkt.Put([]byte(key), []byte(value))
+		return bkt.Put([]byte(key), value)
 	})
 }
 
@@ -74,4 +75,8 @@ func (db *Boltdb) GetKeyValue(key string) (string, error) {
 	}
 
 	return value, nil
+}
+
+func (db *Boltdb) GetSnapshot() ([]byte, error) {
+	return []byte{}, nil
 }

@@ -21,7 +21,7 @@ type wait struct {
 	m map[uint64]waitItem
 }
 
-func newWati() *wait {
+func newWait() *wait {
 	return &wait{m: make(map[uint64]waitItem)}
 }
 
