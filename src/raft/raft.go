@@ -382,6 +382,10 @@ func (n *Node) publishEntries(ents []raftpb.Entry) bool {
 			id := strconv.FormatUint(r.ID, 10)
 			n.store.PutKeyValue(id, []byte(id))
 
+			if !n.wait.trigger(r.ID, &applyResult{resp: &r, err: nil}) {
+				n.wait.cancelAll()
+			}
+
 		case raftpb.EntryConfChange:
 			var cc raftpb.ConfChange
 			cc.Unmarshal(ents[i].Data)
