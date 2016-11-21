@@ -10,7 +10,7 @@ func (api *Api) ApiRouter() *gin.Engine {
 		v1Router.GET("/raft/status", api.RaftStatus)
 		v1Router.GET("/raft/leader", api.RaftLeadr)
 		v1Router.POST("/raft/store", api.SaveRaftData)
-		v1Router.GET("raft/store/:key", api.GetRaftData)
+		v1Router.GET("/raft/store/:key", api.GetRaftData)
 	}
 
 	return router

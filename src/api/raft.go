@@ -18,7 +18,11 @@ func (api *Api) RaftLeadr(ctx *gin.Context) {
 
 func (api *Api) SaveRaftData(ctx *gin.Context) {
 	err := api.Node.ProposeValue(ctx, nil, nil)
-	ctx.JSON(http.StatusOK, gin.H{"code": 0, "data": err.Error()})
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{"code": 0, "data": err.Error()})
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"code": 0, "data": "success"})
 	return
 }
 
