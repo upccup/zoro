@@ -59,8 +59,6 @@ var (
 )
 
 type Node struct {
-	errorC chan<- error // errors from raft serrion
-
 	id        int      // client id for raft serrsion
 	peers     []string // raft peer URLS
 	join      bool     // node is joining an existing cluster
@@ -107,12 +105,8 @@ type applyResult struct {
 	err  error
 }
 
-func NewNode(id int, peers []string, store store.Store) (<-chan error, *Node) {
-
-	errorC := make(chan error)
-
+func NewNode(id int, peers []string, store store.Store) *Node {
 	n := Node{
-		errorC:      errorC,
 		id:          id,
 		peers:       peers,
 		waldir:      fmt.Sprintf("node-%d", id),
@@ -133,7 +127,7 @@ func NewNode(id int, peers []string, store store.Store) (<-chan error, *Node) {
 
 	go n.startRaft()
 
-	return errorC, &n
+	return &n
 }
 
 // Run is the main loop for a Raft node it goes along the state machine
@@ -472,8 +466,6 @@ func (n *Node) replayWAL() *wal.WAL {
 
 func (n *Node) writeError(err error) {
 	n.stopHTTP()
-	n.errorC <- err
-	close(n.errorC)
 	n.raftNode.Stop()
 }
 
@@ -546,7 +538,6 @@ func (n *Node) startRaft() {
 // closes http closes all channels and stops rafts
 func (n *Node) stop(ctx context.Context) {
 	n.stopHTTP()
-	close(n.errorC)
 	n.leadershipBroadcast.Close()
 	n.ticker.Stop()
 	n.raftNode.Stop()

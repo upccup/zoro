@@ -34,7 +34,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_, raftNode := raft.NewNode(*id, strings.Split(*cluster, ","), boltdbStore)
+	raftNode := raft.NewNode(*id, strings.Split(*cluster, ","), boltdbStore)
 
 	leadershipCh, cancel := raftNode.SubscribeLeaderShip()
 	defer cancel()
