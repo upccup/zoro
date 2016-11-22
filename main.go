@@ -41,6 +41,18 @@ func main() {
 
 	go handleLeadershipEvents(context.TODO(), leadershipCh)
 
+	ctx := context.Background()
+	go func() {
+		err := raftNode.StartRaft(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	if err := raftNode.WaitForLeader(ctx); err != nil {
+		log.Fatal(err)
+	}
+
 	api := api.Api{
 		Node:  raftNode,
 		Store: boltdbStore,

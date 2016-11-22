@@ -56,6 +56,12 @@ var (
 
 	// retuns when a raft internal message is too large to be sent
 	ErrRequestTooLarge = errors.New("raft: raft messahe is too large and can't be send")
+
+	// returns when the node is not yet part of a raft cluster
+	ErrNoRaftMember = errors.New("raft: node is not yet part of a raft cluster")
+
+	// returns when the cluster has no elected leader
+	ErrNoClusterLeader = errors.New("raft: no elected cluster leader")
 )
 
 type Node struct {
@@ -72,6 +78,7 @@ type Node struct {
 
 	// raft backing for commit/error channel
 	raftNode    raft.Node
+	Config      *raft.Config
 	raftStorage *raft.MemoryStorage
 	wal         *wal.WAL
 
@@ -86,6 +93,7 @@ type Node struct {
 	wait                *wait
 	reqIDGen            *idutil.Generator
 	signalledLeadership uint32
+	isMember            uint32
 	ticker              clock.Ticker
 	leadershipBroadcast *watch.Queue
 	store               store.Store
@@ -124,8 +132,6 @@ func NewNode(id int, peers []string, store store.Store) *Node {
 	n.ticker = clock.NewClock().NewTicker(time.Second)
 	n.reqIDGen = idutil.NewGenerator(uint16(n.id), time.Now())
 	n.wait = newWait()
-
-	go n.startRaft()
 
 	return &n
 }
@@ -185,7 +191,6 @@ func (n *Node) Run(ctx context.Context) error {
 			n.raftStorage.Append(rd.Entries)
 			n.transport.Send(rd.Messages)
 			if ok := n.publishEntries(n.entriesToApply(rd.CommittedEntries)); !ok {
-				log.G(ctx).Println("*************************")
 				return errors.New("publishEntries failed")
 			}
 
@@ -200,12 +205,9 @@ func (n *Node) Run(ctx context.Context) error {
 			n.raftNode.Advance()
 
 		case err := <-n.transport.ErrorC:
-			log.G(ctx).Println("*************************222", err)
-			n.writeError(err)
 			return err
 
 		case <-n.stopc:
-			log.G(ctx).Println("*************************11")
 			n.stop(ctx)
 			return nil
 
@@ -282,7 +284,6 @@ func (n *Node) processInternalRaftRequest(ctx context.Context, r *ztypes.Interna
 	n.stopMu.RUnlock()
 
 	r.ID = n.reqIDGen.Next()
-	fmt.Println("--------------:  ", r.ID)
 
 	// this must be derived from the context which is cancelled bu stop()
 	// to avoid a deadlock on shutdown
@@ -464,15 +465,10 @@ func (n *Node) replayWAL() *wal.WAL {
 	return w
 }
 
-func (n *Node) writeError(err error) {
-	n.stopHTTP()
-	n.raftNode.Stop()
-}
-
-func (n *Node) startRaft() {
+func (n *Node) StartRaft(ctx context.Context) error {
 	if !fileutil.Exist(n.snapdir) {
 		if err := os.Mkdir(n.snapdir, 0755); err != nil {
-			log.L.Fatalf("startRaft: cannot create dir for snapshot %v", err)
+			return err
 		}
 	}
 
@@ -486,7 +482,7 @@ func (n *Node) startRaft() {
 		startPeers[i] = raft.Peer{ID: uint64(i + 1)}
 	}
 
-	c := raft.Config{
+	n.Config = &raft.Config{
 		ID:              uint64(n.id),
 		ElectionTick:    10,
 		HeartbeatTick:   2,
@@ -496,9 +492,9 @@ func (n *Node) startRaft() {
 	}
 
 	if oldwal {
-		n.raftNode = raft.RestartNode(&c)
+		n.raftNode = raft.RestartNode(n.Config)
 	} else {
-		n.raftNode = raft.StartNode(&c, startPeers)
+		n.raftNode = raft.StartNode(n.Config, startPeers)
 	}
 
 	ss := &stats.ServerStats{}
@@ -525,14 +521,91 @@ func (n *Node) startRaft() {
 
 	snap, err := n.raftStorage.Snapshot()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	n.confState = snap.Metadata.ConfState
 	n.snapshotIndex = snap.Metadata.Index
 	n.appliedIndex = snap.Metadata.Index
 
-	go n.Run(context.TODO())
+	atomic.StoreUint32(&n.isMember, 1)
+
+	go n.Run(ctx)
+
+	return nil
+}
+
+func (n *Node) WaitForLeader(ctx context.Context) error {
+	_, err := n.Leader()
+	if err == nil {
+		return nil
+	}
+
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for err != nil {
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		_, err = n.Leader()
+	}
+	return nil
+}
+
+// checks if the raft node has effectively joined a cluster of existing member
+func (n *Node) IsMember() bool {
+	return atomic.LoadUint32(&n.isMember) == 1
+}
+
+// checks if we are the leader or not, without the protection of lock
+func (n *Node) isLeader() bool {
+	if !n.IsMember() {
+		return false
+	}
+
+	if n.Status().Lead == n.Config.ID {
+		return true
+	}
+
+	return false
+}
+
+// checks if we are the leader or not, with the protection of lock
+func (n *Node) IsLeader() bool {
+	n.stopMu.RLock()
+	defer n.stopMu.RUnlock()
+	return n.isLeader()
+}
+
+// returns status  of underlying etcd.Node
+func (n *Node) Status() raft.Status {
+	return n.raftNode.Status()
+}
+
+// returns the id of the leader, without the protection of lock and membership check, so it,s caller task
+func (n *Node) leader() uint64 {
+	return n.Status().Lead
+}
+
+// returns the is of the leader, with the protecttion of lock
+func (n *Node) Leader() (uint64, error) {
+	n.stopMu.RLock()
+	defer n.stopMu.RUnlock()
+
+	if !n.IsMember() {
+		return raft.None, ErrNoRaftMember
+	}
+
+	leader := n.leader()
+	if leader == raft.None {
+		return raft.None, ErrNoClusterLeader
+	}
+
+	return leader, nil
 }
 
 // closes http closes all channels and stops rafts
@@ -541,6 +614,7 @@ func (n *Node) stop(ctx context.Context) {
 	n.leadershipBroadcast.Close()
 	n.ticker.Stop()
 	n.raftNode.Stop()
+	atomic.StoreUint32(&n.isMember, 0)
 }
 
 func (n *Node) stopHTTP() {
@@ -601,10 +675,6 @@ func (n *Node) maybeTriggerSnapshot() {
 
 	log.L.Printf("maybeTriggerSnapshot: Compact log at index %d", compactIndex)
 	n.snapshotIndex = n.appliedIndex
-}
-
-func (n *Node) Status() raft.Status {
-	return n.raftNode.Status()
 }
 
 func (n *Node) serveRaft() {
