@@ -419,15 +419,15 @@ func (n *Node) publishEntries(ents []raftpb.Entry) bool {
 }
 
 // returns a WAl ready for reading
-func (n *Node) openWAL() *wal.WAL {
+func (n *Node) openWAL() (*wal.WAL, error) {
 	if !wal.Exist(n.waldir) {
 		if err := os.Mkdir(n.waldir, 0750); err != nil {
-			log.L.Fatalf("cannot create dir for wal %v", err)
+			return nil, err
 		}
 
 		w, err := wal.Create(n.waldir, nil)
 		if err != nil {
-			log.L.Fatalf("create wal error %v", err)
+			return nil, err
 		}
 
 		w.Close()
@@ -435,20 +435,22 @@ func (n *Node) openWAL() *wal.WAL {
 
 	w, err := wal.Open(n.waldir, walpb.Snapshot{})
 	if err != nil {
-		log.L.Fatalf("loading wal error %v", err)
+		return nil, err
 	}
 
-	return w
+	return w, nil
 }
 
 // replays WAL entries into the raft instance
-func (n *Node) replayWAL() *wal.WAL {
-	w := n.openWAL()
+func (n *Node) replayWAL() (*wal.WAL, error) {
+	w, err := n.openWAL()
+	if err != nil {
+		return nil, err
+	}
 
 	_, st, ents, err := w.ReadAll()
-
 	if err != nil {
-		log.L.Fatalf("replayWAL: failed to read WAL %v", err)
+		return nil, err
 	}
 
 	// append to storage so raft starts at the right place in log
@@ -462,7 +464,7 @@ func (n *Node) replayWAL() *wal.WAL {
 	}
 
 	n.raftStorage.SetHardState(st)
-	return w
+	return w, nil
 }
 
 func (n *Node) StartRaft(ctx context.Context) error {
@@ -475,7 +477,11 @@ func (n *Node) StartRaft(ctx context.Context) error {
 	n.snapshotter = snap.New(n.snapdir)
 
 	oldwal := wal.Exist(n.waldir)
-	n.wal = n.replayWAL()
+	wal, err := n.replayWAL()
+	if err != nil {
+		return err
+	}
+	n.wal = wal
 
 	startPeers := make([]raft.Peer, len(n.peers))
 	for i := range startPeers {
